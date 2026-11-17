@@ -1,0 +1,332 @@
+{
+ "version": 1,
+ "checked_on": "2026-11-16",
+ "sources": [
+  {
+   "id": "eurlex-oj",
+   "name": "EUR-Lex: Official Journal of the EU (acts, authentic text)",
+   "jurisdiction": "EU",
+   "publisher": "Publications Office of the EU",
+   "tier": 1,
+   "authenticity": "official_journal",
+   "evidence_allowed": true,
+   "automation": "allowed",
+   "domains": [
+    "eur-lex.europa.eu",
+    "publications.europa.eu",
+    "data.europa.eu"
+   ],
+   "access": {
+    "method": "CELLAR REST (content negotiation on resource URIs) and SPARQL",
+    "urls": [
+     "https://publications.europa.eu/resource/celex/{CELEX}",
+     "https://publications.europa.eu/webapi/rdf/sparql",
+     "http://data.europa.eu/eli/reg/{year}/{number}/oj"
+    ],
+    "auth": "none seen in public endpoint descriptions",
+    "formats": [
+     "XHTML",
+     "XML (Formex)",
+     "PDF"
+    ]
+   },
+   "update": "continuous; ingestion notification feed http://publications.europa.eu/webapi/notification/ingestion",
+   "reuse": "public reuse with acknowledgement of source reported; confirm the current EUR-Lex legal notice before launch",
+   "verified": {
+    "on": "2026-11-16",
+    "status": "verified",
+    "how": "Fetched the EUR-Lex page of Council Regulation (EU) 2026/382 (ELI, OJ reference, 'In force' flag); public CELLAR endpoint descriptions found in search results.",
+    "to_confirm": [
+     "exact reuse terms",
+     "rate limits",
+     "authenticity wording of the legal notice"
+    ]
+   },
+   "notes": "Authentic text is the Official Journal. Use ELI/CELEX as identifiers."
+  },
+  {
+   "id": "eurlex-consolidated",
+   "name": "EUR-Lex: consolidated texts (sector 0)",
+   "jurisdiction": "EU",
+   "publisher": "Publications Office of the EU",
+   "tier": 1,
+   "authenticity": "consolidated_no_legal_effect",
+   "evidence_allowed": true,
+   "automation": "allowed",
+   "domains": [
+    "eur-lex.europa.eu",
+    "publications.europa.eu"
+   ],
+   "access": {
+    "method": "same as eurlex-oj; CELEX sector 0",
+    "urls": [
+     "https://publications.europa.eu/resource/celex/{CELEX}"
+    ],
+    "auth": "none",
+    "formats": [
+     "XHTML",
+     "PDF"
+    ]
+   },
+   "update": "with delay after each amendment (days to weeks); show the consolidation date",
+   "reuse": "as eurlex-oj",
+   "verified": {
+    "on": "2026-11-16",
+    "status": "partly_verified",
+    "how": "Sector 0 'consolidated legislation' confirmed in public descriptions; the 'no legal effect' wording was carried from the previous run and is not re-checked here.",
+    "to_confirm": [
+     "no-legal-effect disclaimer wording",
+     "typical consolidation delay"
+    ]
+   },
+   "notes": "Every statement relying on it carries a warning to check the Official Journal text."
+  },
+  {
+   "id": "cellar-metadata",
+   "name": "CELLAR metadata (dates, relations between acts)",
+   "jurisdiction": "EU",
+   "publisher": "Publications Office of the EU",
+   "tier": 1,
+   "authenticity": "official_database",
+   "evidence_allowed": false,
+   "automation": "allowed",
+   "domains": [
+    "publications.europa.eu"
+   ],
+   "access": {
+    "method": "SPARQL (HTTP GET/POST) with the CDM ontology",
+    "urls": [
+     "https://publications.europa.eu/webapi/rdf/sparql"
+    ],
+    "auth": "none",
+    "formats": [
+     "JSON",
+     "XML"
+    ]
+   },
+   "update": "continuous",
+   "reuse": "as eurlex-oj",
+   "verified": {
+    "on": "2026-11-16",
+    "status": "partly_verified",
+    "how": "SPARQL endpoint and the properties cdm:resource_legal_id_celex and cdm:work_date_document seen in public examples.",
+    "to_confirm": [
+     "properties for entry into force, end of validity, amends/repeals"
+    ]
+   },
+   "notes": "Used for dates and links between acts. Quotations come from the text sources."
+  },
+  {
+   "id": "taric-raw",
+   "name": "TARIC raw data extractions (monthly, Excel)",
+   "jurisdiction": "EU",
+   "publisher": "European Commission, DG TAXUD",
+   "tier": 1,
+   "authenticity": "official_database",
+   "evidence_allowed": true,
+   "automation": "allowed",
+   "domains": [
+    "taxation-customs.ec.europa.eu",
+    "circabc.europa.eu"
+   ],
+   "access": {
+    "method": "CIRCABC group 'TARIC and Quota Data & Information'",
+    "urls": [
+     "https://circabc.europa.eu/w/browse/0e5f18c2-4b2f-42e9-aed4-dfe50ae1263b"
+    ],
+    "auth": "an older CIRCABC page says EU Login membership is needed; verify with a real account",
+    "formats": [
+     "XLSX (raw extraction)"
+    ]
+   },
+   "update": "monthly, snapshot of the first day of the month; a simplified version is also shown on the consultation page",
+   "reuse": "to confirm with the Commission before commercial redistribution",
+   "verified": {
+    "on": "2026-11-16",
+    "status": "partly_verified",
+    "how": "The Commission TARIC page states raw data is freely available in Excel format and that TARIC has no VAT or excise; the CIRCABC group page was found.",
+    "to_confirm": [
+     "access conditions",
+     "licence",
+     "file naming"
+    ]
+   },
+   "notes": "Legal basis Council Regulation (EEC) No 2658/87. TARIC is a tool, only Official Journal acts are authentic. Monthly snapshots lag behind daily changes: show the snapshot date."
+  },
+  {
+   "id": "taric-consultation",
+   "name": "TARIC Consultation (web)",
+   "jurisdiction": "EU",
+   "publisher": "European Commission, DG TAXUD",
+   "tier": 1,
+   "authenticity": "official_database",
+   "evidence_allowed": false,
+   "automation": "manual_only",
+   "domains": [
+    "ec.europa.eu"
+   ],
+   "access": {
+    "method": "web interface for people",
+    "urls": [
+     "https://ec.europa.eu/taxation_customs/dds2/taric"
+    ],
+    "auth": "none",
+    "formats": [
+     "HTML"
+    ]
+   },
+   "update": "daily on working days (evening)",
+   "reuse": "not for automated collection until the robots rules are checked",
+   "verified": {
+    "on": "2026-11-16",
+    "status": "to_verify",
+    "how": "A third-party description says the consultation pages are excluded from automated access by robots policy. Not checked directly.",
+    "to_confirm": [
+     "robots.txt",
+     "terms of use"
+    ]
+   },
+   "notes": "A specialist may check it by hand for a current measure and note the date."
+  },
+  {
+   "id": "sejm-eli",
+   "name": "Sejm ELI API: Dziennik Ustaw and Monitor Polski",
+   "jurisdiction": "PL",
+   "publisher": "Kancelaria Sejmu",
+   "tier": 1,
+   "authenticity": "official_gazette",
+   "evidence_allowed": true,
+   "automation": "allowed",
+   "domains": [
+    "api.sejm.gov.pl",
+    "eli.gov.pl",
+    "isap.sejm.gov.pl"
+   ],
+   "access": {
+    "method": "REST JSON; /acts, /acts/{publisher}/{year}, /acts/{publisher}/{year}/{position}, .../text.html, .../text.pdf",
+    "urls": [
+     "https://api.sejm.gov.pl/eli/acts/{publisher}/{year}/{position}"
+    ],
+    "auth": "none seen",
+    "formats": [
+     "JSON",
+     "HTML",
+     "PDF"
+    ]
+   },
+   "update": "changeDate is returned per act; poll daily",
+   "reuse": "to confirm with Kancelaria Sejmu",
+   "verified": {
+    "on": "2026-11-16",
+    "status": "verified",
+    "how": "Fields ELI, announcementDate, entryIntoForce, inForce, status, texts[type H/O/I/T], references (amending, amended, repealed, refers-to) read in the official API description and real response excerpts.",
+    "to_confirm": [
+     "reuse terms",
+     "rate limits",
+     "consolidated-text (tekst jednolity) handling",
+     "whether old acts lack a text layer"
+    ]
+   },
+   "notes": "'ogl' = announced text, 'tj' = consolidated text, published as separate acts. Treat each as its own version."
+  },
+  {
+   "id": "commission-taxud",
+   "name": "European Commission, DG TAXUD: guidance and news",
+   "jurisdiction": "EU",
+   "publisher": "European Commission",
+   "tier": 2,
+   "authenticity": "official_guidance",
+   "evidence_allowed": true,
+   "automation": "allowed",
+   "domains": [
+    "taxation-customs.ec.europa.eu"
+   ],
+   "access": {
+    "method": "web pages",
+    "urls": [
+     "https://taxation-customs.ec.europa.eu/Customs/eu-Customs-Reform_en"
+    ],
+    "auth": "none",
+    "formats": [
+     "HTML"
+    ]
+   },
+   "update": "irregular; each page shows its publication and update dates",
+   "reuse": "to confirm",
+   "verified": {
+    "on": "2026-11-16",
+    "status": "verified",
+    "how": "Read the pages on the EU customs reform and the temporary EUR 3 duty (published 8 June 2026, updated 20 July 2026).",
+    "to_confirm": [
+     "reuse"
+    ]
+   },
+   "notes": "Explains the law. It is not the law: show it as 'official guidance' next to the act."
+  },
+  {
+   "id": "pl-mf-kas",
+   "name": "Polish Ministry of Finance and customs (KAS) portals",
+   "jurisdiction": "PL",
+   "publisher": "Ministerstwo Finansów / KAS",
+   "tier": 2,
+   "authenticity": "official_guidance",
+   "evidence_allowed": false,
+   "automation": "to_verify",
+   "domains": [
+    "gov.pl",
+    "podatki.gov.pl"
+   ],
+   "access": {
+    "method": "web; Polish tariff system ISZTAR to be checked",
+    "urls": [],
+    "auth": "unknown",
+    "formats": [
+     "HTML"
+    ]
+   },
+   "update": "unknown",
+   "reuse": "unknown",
+   "verified": {
+    "on": "2026-11-16",
+    "status": "to_verify",
+    "how": "Not checked in this run.",
+    "to_confirm": [
+     "every field"
+    ]
+   },
+   "notes": "Check access and licence before any use. Not evidence until verified."
+  },
+  {
+   "id": "secondary",
+   "name": "Law-firm blogs, news, forums, consultancy articles",
+   "jurisdiction": "*",
+   "publisher": "various",
+   "tier": 3,
+   "authenticity": "secondary",
+   "evidence_allowed": false,
+   "automation": "manual_only",
+   "domains": [
+    "globalimportblog.bakermckenzie.com",
+    "mondaq.com",
+    "regfollower.com"
+   ],
+   "access": {
+    "method": "web",
+    "urls": [],
+    "auth": "none",
+    "formats": [
+     "HTML"
+    ]
+   },
+   "update": "irregular",
+   "reuse": "quote only briefly, never as legal basis",
+   "verified": {
+    "on": "2026-11-16",
+    "status": "verified",
+    "how": "Seen in searches; used only to find primary sources.",
+    "to_confirm": []
+   },
+   "notes": "Orientation only. When a secondary source disagrees with the primary text, the primary text wins and the conflict is shown."
+  }
+ ]
+}

@@ -1,8 +1,9 @@
-# Render Blueprint: публикует сайт как Static Site (бесплатно, без «засыпания»).
+# Render Blueprint: publish the existing frontend from public/ and assemble root-level assets first.
 services:
   - type: web
     runtime: static
     name: tradeline-europe
+    buildCommand: bash scripts/build-static.sh
     staticPublishPath: ./public
     pullRequestPreviewsEnabled: false
     headers:
@@ -13,27 +14,5 @@ services:
         name: Referrer-Policy
         value: strict-origin-when-cross-origin
 
-# Чат с ИИ (необязательно). Раскомментируйте, когда будете готовы платить за сервис и API модели:
-#  - type: web
-#    runtime: docker
-#    name: tradeline-chat
-#    dockerfilePath: ./chat-server/Dockerfile
-#    dockerContext: ./chat-server
-#    plan: starter           # бесплатный план «засыпает» (первый ответ после паузы ~1 минута) и теряет счётчики
-#    disk: { name: usage, mountPath: /data, sizeGB: 1 }
-#    envVars:
-#      - key: ANTHROPIC_API_KEY
-#        sync: false
-#      - key: ALLOWED_ORIGINS
-#        value: https://tradeline-europe.onrender.com
-
-# Этап 2 (когда появится сервер Legal Intelligence): добавьте сюда второй сервис, например
-#  - type: web
-#    runtime: docker
-#    name: tradeline-legal-api
-#    dockerfilePath: ./legal-api/Dockerfile
-#    dockerContext: ./legal-api
-#    plan: starter          # бесплатный план «засыпает» и не хранит файлы
-#    envVars:
-#      - key: ANTHROPIC_API_KEY
-#        sync: false
+# The Python APIs are separate web services, not part of this static site.
+# Enable/configure each service separately after its backend implementation is deployment-ready.

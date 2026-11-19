@@ -1,5 +1,6 @@
-// Public, non-secret configuration. API URLs are set by deployment.
+// Public deployment configuration. Set chatApi/apiUrl to the deployed API origin.
 window.TL_CONFIG = Object.assign({
-  legalApi: "",
-  chatApi: ""
+  legalApi: "https://tradeline-api.onrender.com",
+  chatApi: "https://tradeline-api.onrender.com",
+  apiUrl: "https://tradeline-api.onrender.com"
 }, window.TL_CONFIG || {});

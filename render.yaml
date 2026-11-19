@@ -1,4 +1,4 @@
-# Render Blueprint: static frontend plus the real TRADELINE API.
+# Render free-tier Blueprint. No disk and no paid resource declarations.
 services:
   - type: web
     runtime: static
@@ -19,24 +19,18 @@ services:
     name: tradeline-api
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
-    disk:
-      name: tradeline-data
-      mountPath: /data
-      sizeGB: 1
     envVars:
-      - key: DB_PATH
-        value: /data/tradeline.db
       - key: ALLOWED_ORIGINS
-        value: https://tradeline-europe.onrender.com
+        value: https://tradeline-europe-u7gw.onrender.com
+      - key: DB_PATH
+        value: /tmp/tradeline.db
       - key: ANTHROPIC_API_KEY
         sync: false
-      - key: SMTP_HOST
+      - key: CLAUDE_MODEL
+        value: claude-sonnet-4-5
+      - key: DATABASE_URL
         sync: false
-      - key: SMTP_PORT
-        value: "587"
-      - key: SMTP_USER
+      - key: RESEND_API_KEY
         sync: false
-      - key: SMTP_PASS
-        sync: false
-      - key: SMTP_FROM
+      - key: EMAIL_FROM
         sync: false

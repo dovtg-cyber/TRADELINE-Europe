@@ -1,4 +1,4 @@
-# Render Blueprint: publish the existing frontend from public/ and assemble root-level assets first.
+# Render Blueprint: static frontend plus the real TRADELINE API.
 services:
   - type: web
     runtime: static
@@ -14,5 +14,29 @@ services:
         name: Referrer-Policy
         value: strict-origin-when-cross-origin
 
-# The Python APIs are separate web services, not part of this static site.
-# Enable/configure each service separately after its backend implementation is deployment-ready.
+  - type: web
+    runtime: docker
+    name: tradeline-api
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    disk:
+      name: tradeline-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: DB_PATH
+        value: /data/tradeline.db
+      - key: ALLOWED_ORIGINS
+        value: https://tradeline-europe.onrender.com
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false

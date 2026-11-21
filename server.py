@@ -2,7 +2,7 @@
 """TRADELINE API: accounts, verification, password reset and AI chat proxy."""
 from __future__ import annotations
 
-import hashlib, json, os, re, secrets, sqlite3, threading, time, urllib.error, urllib.request
+import hashlib, json, os, re, secrets, sqlite3, threading, time, urllib.error, urllib.parse, urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 EMAIL=re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
@@ -11,7 +11,7 @@ VID=re.compile(r"^[a-z0-9]{8,64}$")
 
 def cfg():
     e=os.environ.get
-    return {"port":int(e("PORT","8080")),"key":e("ANTHROPIC_API_KEY",""),"upstream":e("UPSTREAM_URL","https://api.anthropic.com/v1/messages"),"model":e("CLAUDE_MODEL","claude-sonnet-4-5"),"free":int(e("FREE_LIMIT","5")),"ip_daily":int(e("IP_DAILY_LIMIT","25")),"db":e("DB_PATH","usage.db"),"database_url":e("DATABASE_URL",""),"max_tokens":int(e("MAX_TOKENS","600")),"paid":{x.strip().lower() for x in e("PAID_EMAILS","").split(',') if x.strip()},"origins":[x.strip() for x in e("ALLOWED_ORIGINS","https://tradeline-europe-u7gw.onrender.com").split(',') if x.strip()],"resend_api_key":e("RESEND_API_KEY",""),"email_from":e("EMAIL_FROM",""),"smtp_host":e("SMTP_HOST",""),"smtp_port":int(e("SMTP_PORT","587")),"smtp_user":e("SMTP_USER",""),"smtp_pass":e("SMTP_PASS",""),"smtp_from":e("SMTP_FROM",e("SMTP_USER",""))}
+    return {"port":int(e("PORT","8080")),"key":e("GEMINI_API_KEY",e("GOOGLE_API_KEY","")),"upstream":e("GEMINI_UPSTREAM","https://generativelanguage.googleapis.com/v1beta/models"),"model":e("GEMINI_MODEL","gemini-2.5-flash"),"free":int(e("FREE_LIMIT","5")),"ip_daily":int(e("IP_DAILY_LIMIT","25")),"db":e("DB_PATH","usage.db"),"database_url":e("DATABASE_URL",""),"max_tokens":int(e("MAX_TOKENS","600")),"paid":{x.strip().lower() for x in e("PAID_EMAILS","").split(',') if x.strip()},"origins":[x.strip() for x in e("ALLOWED_ORIGINS","https://tradeline-europe-u7gw.onrender.com").split(',') if x.strip()],"resend_api_key":e("RESEND_API_KEY",""),"email_from":e("EMAIL_FROM",""),"smtp_host":e("SMTP_HOST",""),"smtp_port":int(e("SMTP_PORT","587")),"smtp_user":e("SMTP_USER",""),"smtp_pass":e("SMTP_PASS",""),"smtp_from":e("SMTP_FROM",e("SMTP_USER",""))}
 
 SYSTEM=("You are TRADELINE Legal Intelligence for TRADELINE EUROPE in Warsaw. Answer in the user's language. Evidence first: never invent laws, articles, rates or links. Prefer official links to EUR-Lex, EU legislation, TARIC, ISAP/Dziennik Ustaw and Polish tax/customs authorities. If a source cannot be verified, say so plainly. If an answer uses a source, provide the complete clickable https:// URL. Separate mandatory rules from recommendations, ask at most three missing questions for country, date, goods, origin and party role, and recommend a qualified specialist for binding conclusions.")
 
@@ -22,7 +22,7 @@ class SqliteStore:
         self.c.executescript("""
         CREATE TABLE IF NOT EXISTS visitor(id TEXT PRIMARY KEY,n INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS ip(ip TEXT,day TEXT,n INTEGER NOT NULL,PRIMARY KEY(ip,day));
-        CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,name TEXT NOT NULL,password TEXT NOT NULL,verified INTEGER NOT NULL DEFAULT 0,verify_code TEXT,verify_until INTEGER,reset_code TEXT,reset_until INTEGER,created_at INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY,email TEXT UNIQUE NOT NULL,name TEXT NOT NULL,password TEXT NOT NULL,verified INTEGER NOT NOT NULL DEFAULT 0,verify_code TEXT,verify_until INTEGER,reset_code TEXT,reset_until INTEGER,created_at INTEGER NOT NULL);
         CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY,user_id TEXT NOT NULL,expires_at INTEGER NOT NULL,FOREIGN KEY(user_id) REFERENCES accounts(id) ON DELETE CASCADE);
         """);self.c.commit()
     @staticmethod
@@ -177,9 +177,22 @@ def send_email(c,to,subject,text):
 
 
 def call_model(c,messages):
-    body=json.dumps({"model":c["model"],"max_tokens":c["max_tokens"],"system":SYSTEM,"messages":messages}).encode();req=urllib.request.Request(c["upstream"],data=body,method="POST",headers={"content-type":"application/json","x-api-key":c["key"],"anthropic-version":"2023-06-01"})
+    contents=[]
+    if messages:
+        contents.append({"role":"user","parts":[{"text":"SYSTEM INSTRUCTIONS:\n"+SYSTEM}]})
+    for message in messages:
+        role="model" if message["role"]=="assistant" else "user"
+        contents.append({"role":role,"parts":[{"text":message["content"]}]})
+    body=json.dumps({"contents":contents,"generationConfig":{"temperature":0.2,"maxOutputTokens":c["max_tokens"]}}).encode()
+    model=urllib.parse.quote(c["model"],safe="")
+    url=c["upstream"].rstrip("/")+"/"+model+":generateContent"
+    req=urllib.request.Request(url,data=body,method="POST",headers={"content-type":"application/json","x-goog-api-key":c["key"]})
     with urllib.request.urlopen(req,timeout=60) as r:payload=json.loads(r.read())
-    return "".join(block.get("text","") for block in payload.get("content",[]) if block.get("type")=="text").strip()
+    texts=[]
+    for candidate in payload.get("candidates",[]):
+        for part in candidate.get("content",{}).get("parts",[]):
+            if isinstance(part.get("text"),str):texts.append(part["text"])
+    return "".join(texts).strip()
 
 
 def make_handler(c,store):
@@ -200,7 +213,7 @@ def make_handler(c,store):
         def token(self):
             value=self.headers.get("Authorization","");return value[7:] if value.startswith("Bearer ") else ""
         def do_GET(self):
-            if self.path=="/health":return self.send_json(200,{"ok":True,"database":"postgresql" if c["database_url"] else "sqlite","ai":bool(c["key"]),"email":bool(c["resend_api_key"] or c["smtp_host"])})
+            if self.path=="/health":return self.send_json(200,{"ok":True,"database":"postgresql" if c["database_url"] else "sqlite","ai":bool(c["key"]),"email":bool(c["resend_api_key"] or c["smtp_host"]),"provider":"gemini" if c["key"] else "none"})
             if self.path=="/api/account":
                 account=store.account(self.token());return self.send_json(200,account) if account else self.send_json(401,{"error":"unauthorized"})
             self.send_json(404,{"error":"not_found"})
@@ -239,8 +252,8 @@ def make_handler(c,store):
             if self.path=="/api/auth/reset":
                 email=str(body.get("email","")).strip().lower();password=str(body.get("password",""))
                 if len(password)<8:return self.send_json(400,{"error":"bad_password"})
-                if not store.reset_password(email,str(body.get("code","")),password):return self.send_json(400,{"error":"invalid_or_expired"})
-                return self.send_json(200,{"ok":True})
+                if not store.reset_password(email,str(body.get("code","")),password):return self.send_json(200,{"ok":True})
+                return self.send_json(400,{"error":"invalid_or_expired"})
             if self.path=="/api/chat":
                 messages=body.get("messages",[]);visitor=str(body.get("visitor",""));email=str(body.get("email","")).strip().lower()
                 valid=isinstance(messages,list) and 1<=len(messages)<=12 and messages[0].get("role")=="user" and messages[-1].get("role")=="user" and VID.match(visitor) and all(m.get("role") in ("user","assistant") and isinstance(m.get("content"),str) and 0<len(m["content"])<=2000 for m in messages)

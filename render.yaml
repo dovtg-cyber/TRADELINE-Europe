@@ -30,7 +30,3 @@ services:
         value: gemini-2.5-flash
       - key: DATABASE_URL
         sync: false
-      - key: RESEND_API_KEY
-        sync: false
-      - key: EMAIL_FROM
-        sync: false

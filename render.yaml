@@ -24,13 +24,9 @@ services:
         value: https://tradeline-europe-u7gw.onrender.com
       - key: DB_PATH
         value: /tmp/tradeline.db
-      - key: ANTHROPIC_API_KEY
+      - key: GEMINI_API_KEY
         sync: false
-      - key: CLAUDE_MODEL
-        value: claude-sonnet-4-5
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
       - key: DATABASE_URL
-        sync: false
-      - key: RESEND_API_KEY
-        sync: false
-      - key: EMAIL_FROM
         sync: false

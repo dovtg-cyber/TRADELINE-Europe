@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TRADELINE API: password-based accounts and Gemini chat proxy."""
+"""TRADELINE API: password-based accounts and a free-tier chat proxy (Groq by default)."""
 from __future__ import annotations
 
 import hashlib, json, os, re, secrets, sqlite3, threading, time, urllib.error, urllib.parse, urllib.request
@@ -7,11 +7,27 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 EMAIL=re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 VID=re.compile(r"^[a-z0-9]{8,64}$")
+PRESETS={
+    "groq":("https://api.groq.com/openai/v1","openai/gpt-oss-120b","openai"),
+    "openrouter":("https://openrouter.ai/api/v1","openai/gpt-oss-120b:free","openai"),
+    "gemini":("https://generativelanguage.googleapis.com/v1beta/models","gemini-2.5-flash","gemini"),
+}
 
 
 def cfg():
     e=os.environ.get
-    return {"port":int(e("PORT","8080")),"key":e("GEMINI_API_KEY",e("GOOGLE_API_KEY","")),"upstream":e("GEMINI_UPSTREAM","https://generativelanguage.googleapis.com/v1beta/models"),"model":e("GEMINI_MODEL","gemini-2.5-flash"),"free":int(e("FREE_LIMIT","5")),"ip_daily":int(e("IP_DAILY_LIMIT","25")),"db":e("DB_PATH","usage.db"),"database_url":e("DATABASE_URL",""),"max_tokens":int(e("MAX_TOKENS","600")),"paid":{x.strip().lower() for x in e("PAID_EMAILS","").split(',') if x.strip()},"origins":[x.strip() for x in e("ALLOWED_ORIGINS","https://tradeline-europe-u7gw.onrender.com").split(',') if x.strip()]}
+    provider=(e("LLM_PROVIDER") or "groq").strip().lower()
+    base,model,wire=PRESETS.get(provider,PRESETS["groq"])
+    if wire=="gemini":
+        key=e("LLM_API_KEY") or e("GEMINI_API_KEY") or e("GOOGLE_API_KEY") or ""
+        upstream=e("LLM_BASE_URL") or e("GEMINI_UPSTREAM") or base
+        model=e("LLM_MODEL") or e("GEMINI_MODEL") or model
+    else:
+        # GEMINI_* is intentionally ignored here so a leftover paid key cannot be sent to Groq.
+        key=e("LLM_API_KEY") or e("GROQ_API_KEY") or e("ANTHROPIC_API_KEY") or ""
+        upstream=e("LLM_BASE_URL") or e("UPSTREAM_URL") or base
+        model=e("LLM_MODEL") or model
+    return {"port":int(e("PORT","8080")),"provider":provider,"wire":wire,"key":key,"upstream":upstream,"model":model,"free":int(e("FREE_LIMIT","5")),"ip_daily":int(e("IP_DAILY_LIMIT","25")),"db":e("DB_PATH","usage.db"),"database_url":e("DATABASE_URL",""),"max_tokens":int(e("MAX_TOKENS","600")),"paid":{x.strip().lower() for x in e("PAID_EMAILS","").split(',') if x.strip()},"origins":[x.strip() for x in e("ALLOWED_ORIGINS","https://tradeline-europe-u7gw.onrender.com").split(',') if x.strip()]}
 
 SYSTEM=("You are TRADELINE Legal Intelligence for TRADELINE EUROPE in Warsaw. Answer in the user's language. Evidence first: never invent laws, articles, rates or links. Prefer official links to EUR-Lex, EU legislation, TARIC, ISAP/Dziennik Ustaw and Polish tax/customs authorities. If a source cannot be verified, say so plainly. Separate mandatory rules from recommendations, ask at most three missing questions for country, date, goods, origin and party role, and recommend a qualified specialist for binding conclusions.")
 
@@ -85,13 +101,33 @@ class Store:
             with self.lock:self.db.execute("INSERT INTO visitor(id,n) VALUES(?,1) ON CONFLICT(id) DO UPDATE SET n=n+1",(vid,));self.db.execute("INSERT INTO ip(ip,day,n) VALUES(?,?,1) ON CONFLICT(ip,day) DO UPDATE SET n=n+1",(ip,day));self.db.commit()
 
 
+def _openai_text(payload):
+    choice=(payload.get("choices") or [{}])[0]
+    msg=choice.get("message") or {}
+    content=msg.get("content")
+    if isinstance(content,list):
+        content="".join((part.get("text") or "") if isinstance(part,dict) else str(part) for part in content)
+    text=(content or "").strip() if not isinstance(content,list) else content.strip()
+    if text:return text
+    for extra in (msg.get("reasoning_content"),msg.get("reasoning"),choice.get("text")):
+        if isinstance(extra,str) and extra.strip():return extra.strip()
+    return ""
+
+
 def call_model(c,messages):
-    contents=[{"role":"model" if m["role"]=="assistant" else "user","parts":[{"text":m["content"]}]} for m in messages]
-    body=json.dumps({"systemInstruction":{"parts":[{"text":SYSTEM}]},"contents":contents,"generationConfig":{"temperature":0.2,"maxOutputTokens":c["max_tokens"]}}).encode()
-    model=urllib.parse.quote(c["model"],safe="");url=c["upstream"].rstrip("/")+"/"+model+":generateContent"
-    req=urllib.request.Request(url,data=body,method="POST",headers={"content-type":"application/json","x-goog-api-key":c["key"]})
+    if c.get("wire")=="gemini":
+        contents=[{"role":"model" if m["role"]=="assistant" else "user","parts":[{"text":m["content"]}]} for m in messages]
+        body=json.dumps({"systemInstruction":{"parts":[{"text":SYSTEM}]},"contents":contents,"generationConfig":{"temperature":0.2,"maxOutputTokens":c["max_tokens"]}}).encode()
+        model=urllib.parse.quote(c["model"],safe="");url=c["upstream"].rstrip("/")+"/"+model+":generateContent"
+        req=urllib.request.Request(url,data=body,method="POST",headers={"content-type":"application/json","x-goog-api-key":c["key"]})
+        with urllib.request.urlopen(req,timeout=60) as r:payload=json.loads(r.read())
+        return "".join(p["text"] for candidate in payload.get("candidates",[]) for p in candidate.get("content",{}).get("parts",[]) if isinstance(p.get("text"),str)).strip()
+    url=c["upstream"].rstrip("/")
+    if not url.endswith("/chat/completions"):url+="/chat/completions"
+    body=json.dumps({"model":c["model"],"temperature":0.2,"max_tokens":c["max_tokens"],"messages":[{"role":"system","content":SYSTEM},*messages]}).encode()
+    req=urllib.request.Request(url,data=body,method="POST",headers={"content-type":"application/json","authorization":"Bearer "+c["key"]})
     with urllib.request.urlopen(req,timeout=60) as r:payload=json.loads(r.read())
-    return "".join(p["text"] for candidate in payload.get("candidates",[]) for p in candidate.get("content",{}).get("parts",[]) if isinstance(p.get("text"),str)).strip()
+    return _openai_text(payload)
 
 
 def make_handler(c,store):
@@ -112,7 +148,7 @@ def make_handler(c,store):
         def token(self):
             value=self.headers.get("Authorization","");return value[7:] if value.startswith("Bearer ") else ""
         def do_GET(self):
-            if self.path=="/health":return self.send_json(200,{"ok":True,"database":"postgresql" if c["database_url"] else "sqlite","ai":bool(c["key"]),"email":False,"provider":"gemini" if c["key"] else "none"})
+            if self.path=="/health":return self.send_json(200,{"ok":True,"database":"postgresql" if c["database_url"] else "sqlite","ai":bool(c["key"]),"email":False,"provider":c["provider"] if c["key"] else "none"})
             if self.path=="/api/account":
                 account=store.account(self.token());return self.send_json(200,account) if account else self.send_json(401,{"error":"unauthorized"})
             self.send_json(404,{"error":"not_found"})
